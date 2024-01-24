@@ -1,26 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	carsController "main/controllers"
 	"net/http"
 
-	db "main/db"
-
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
 	"github.com/rs/cors"
 )
 
-type Car struct {
-	Id           int
-	Manufacturer string
-	Model        string
-	Year         int
-}
-
 func main() {
-	r := mux.NewRouter()
+	r := httprouter.New()
 	cors := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{
@@ -33,39 +24,15 @@ func main() {
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: false,
 	})
-	db := db.NewDatabase()
 
-	r.HandleFunc("/createCar", func(w http.ResponseWriter, r *http.Request) {
-		stmt, err := db.Prepare(`INSERT INTO cars 
-		(manufacturer, model, year) values(?,?,?)`)
-		checkErr(err)
-
-		_, err = stmt.Exec("Audi", "RS Q8", 2023)
-		checkErr(err)
+	r.GET("/health", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		fmt.Fprintf(w, "Server is running")
 	})
 
-	r.HandleFunc("/getCars", func(w http.ResponseWriter, r *http.Request) {
-		cars := []Car{}
-
-		rows, err := db.Query("SELECT * FROM cars;")
-		checkErr(err)
-
-		for rows.Next() {
-			car := Car{}
-			rows.Scan(&car.Id, &car.Manufacturer, &car.Model, &car.Year)
-			cars = append(cars, car)
-		}
-		rows.Close()
-		res, err := json.Marshal(cars)
-		fmt.Fprintf(w, string(res))
-	})
+	r.POST("/createCar", carsController.CreateCar)
+	r.GET("/getCars", carsController.GetCars)
 
 	handler := cors.Handler(r)
-	http.ListenAndServe(":3002", handler)
-}
-
-func checkErr(err error) {
-	if err != nil {
-		panic(err)
-	}
+	port := ":3002"
+	http.ListenAndServe(port, handler)
 }
